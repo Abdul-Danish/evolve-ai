@@ -14,5 +14,5 @@ public class EvaluationResponse {
 	private boolean shouldAnswer;
 	private float confidence;
 	private String reason;
-	
+
 }

@@ -13,7 +13,7 @@ public class UploadObjectDto {
 
 	private String fileName;
 	private byte[] file;
-	private String minioFilePath;
+//	private String minioFilePath;
 	private String moduleName;
-	
+
 }

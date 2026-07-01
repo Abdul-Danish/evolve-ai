@@ -2,8 +2,8 @@ package com.evolve.listener;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 
+import org.apache.commons.io.FilenameUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.ExtractedTextFormatter;
@@ -37,6 +37,9 @@ public class VectorUploadListener {
 	@Value("${minio.bucket.name}")
 	private String bucketName;
 
+	@Value("${minio.base.path}")
+	private String minioBasePath;
+
 	public VectorUploadListener(VectorStore vectorStore, MinioService minioService,
 			EvolveDocumentsRepository documentsRepository) {
 		this.vectorStore = vectorStore;
@@ -50,29 +53,30 @@ public class VectorUploadListener {
 		UploadObjectDto uploadObject = consumerRecord.value();
 		byte[] content = uploadObject.getFile();
 		String fileName = uploadObject.getFileName();
-		String filePath = uploadObject.getMinioFilePath();
 		String moduleName = uploadObject.getModuleName();
+		String imagePath = minioBasePath + fileName;
 		EvolveDocument document = EvolveDocument.builder().moduleName(moduleName).fileName(fileName)
-				.fileExtension(fileName.split(".")[0]).fileSize((long) content.length).minioObjectPath(filePath)
-				.status(DocumentStatus.PENDING).build();
-		String docId = documentsRepository.save(document).getId();
+				.fileExtension(FilenameUtils.getExtension(fileName)).fileSize((long) content.length)
+				.minioImagePath(imagePath).status(DocumentStatus.PENDING).build();
+		documentsRepository.save(document).getId();
 		try {
-
-			String uploadedFilePath = minioService.uploadObject(fileName, content, filePath);
+			String uploadedFilePath = minioService.uploadObject(fileName, content, minioBasePath);
 			String presignedUrl = minioService.getPresignedUrl(uploadedFilePath);
+
+			document.setStatus(DocumentStatus.PROCESSING);
+			documentsRepository.save(document);
 
 			Resource resourceContent = new ByteArrayResource(content);
 			uploadVector(resourceContent, presignedUrl, moduleName);
 
-			EvolveDocument doc = documentsRepository.findById(docId).get();
-			doc.setStatus(DocumentStatus.COMPLETED);
-			documentsRepository.save(doc);
+			document.setStatus(DocumentStatus.COMPLETED);
+			documentsRepository.save(document);
 		} catch (Exception e) {
-			log.error("upload document failed ", e);
-			EvolveDocument doc = documentsRepository.findById(docId).get();
-			doc.setStatus(DocumentStatus.FAILED);
-			doc.setErrorMessage(e.getMessage());
-			documentsRepository.save(doc);
+			log.error("document upload failed ", e);
+			document.setStatus(DocumentStatus.FAILED);
+			document.setErrorMessage(e.getMessage());
+			documentsRepository.save(document);
+			throw new RuntimeException(e);
 		}
 	}
 

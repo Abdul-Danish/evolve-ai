@@ -27,7 +27,8 @@ public class ChatService {
 	private final ChatClient llamaChatClient;
 	private final EvaluationService evaluationService;
 
-	public ChatService(VectorStore vectorStore, @Qualifier("llamaChatClient") ChatClient llamaChatClient, EvaluationService evaluationService) {
+	public ChatService(VectorStore vectorStore, @Qualifier("llamaChatClient") ChatClient llamaChatClient,
+			EvaluationService evaluationService) {
 		this.vectorStore = vectorStore;
 		this.llamaChatClient = llamaChatClient;
 		this.evaluationService = evaluationService;
@@ -41,24 +42,24 @@ public class ChatService {
 		promptParameters.put("input", message);
 		promptParameters.put("documents", similarDocs);
 		Prompt prompt = promptTemplate.create(promptParameters);
-		
+
 		if (similarDocs.size() == 0) {
-			return Flux.just("I couldn't find enough relevant information.");			
+			return Flux.just("I couldn't find enough relevant information.");
 		}
 //		EvaluationResponse evaluationResponse = evaluationService.evaluateRequest(message, similarDocs);
 //		if (!evaluationResponse.isShouldAnswer() || evaluationResponse.getConfidence() < 0.5) {
 //			return Flux.just("I couldn't find enough relevant information.");	
 //		}
-		
-		return llamaChatClient.prompt(prompt).advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "user-123"))
-				.stream().content();		
+
+		return llamaChatClient.prompt(prompt).advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "user-123")).stream()
+				.content();
 	}
-	
+
 	private List<String> findSimilarDocuments(String message) {
 		List<Document> similarDocuments = vectorStore
 				.similaritySearch(SearchRequest.builder().query(message).topK(1).similarityThreshold(0.6).build());
 		log.info("similar documents found: {}", similarDocuments.size());
 		return similarDocuments.stream().map(doc -> doc.getFormattedContent()).toList();
 	}
-	
+
 }

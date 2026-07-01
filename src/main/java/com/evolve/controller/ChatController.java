@@ -1,7 +1,7 @@
 package com.evolve.controller;
 
 import java.io.IOException;
-import java.util.Map;
+import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -13,16 +13,16 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.evolve.model.EvolveDocument;
 import com.evolve.model.UploadObjectDto;
 import com.evolve.service.ChatService;
 import com.evolve.service.UploadService;
 
 import io.minio.errors.MinioException;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import reactor.core.publisher.Flux;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/evolve")
 @CrossOrigin(origins = "*")
 public class ChatController {
 
@@ -40,16 +40,17 @@ public class ChatController {
 	}
 
 	@PostMapping("/upload")
-	public ResponseEntity<Map<String, Object>> uploadObject(@RequestPart(value = "file") MultipartFile file,
-			@RequestParam(value = "minioFilePath") String minioFilePath,
+	public ResponseEntity<Void> uploadObject(@RequestPart(value = "file") MultipartFile file,
 			@RequestParam(value = "moduleName") String moduleName) throws IOException, MinioException {
+		UploadObjectDto uploadDto = UploadObjectDto.builder().fileName(file.getOriginalFilename()).file(file.getBytes())
+				.moduleName(moduleName).build();
+		uploadService.uploadVector(uploadDto);
+		return ResponseEntity.accepted().build();
+	}
 
-//	@PostMapping("/upload")
-//	public ResponseEntity<Map<String, Object>> uploadObject(@RequestBody UploadObjectDto uploadDto)
-//			throws IOException, MinioException {
-		UploadObjectDto uploadDto = UploadObjectDto.builder().fileName(file.getOriginalFilename())
-				.file(file.getBytes()).minioFilePath(minioFilePath).moduleName(moduleName).build();
-		return ResponseEntity.accepted().body(uploadService.uploadVector(uploadDto));
+	@GetMapping("/documents")
+	public ResponseEntity<List<EvolveDocument>> findAllDocuments() {
+		return ResponseEntity.ok().body(uploadService.findAll());
 	}
 
 }

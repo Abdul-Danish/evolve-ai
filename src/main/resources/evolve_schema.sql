@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS vector.evolve_documents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(225) PRIMARY KEY,
 
     module_name VARCHAR(255) NOT NULL,
 
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS vector.evolve_documents (
 
     file_size BIGINT NOT NULL,
 
-    minio_object_path TEXT NOT NULL,
+    minio_image_path TEXT NOT NULL,
 
     presigned_url TEXT,
 

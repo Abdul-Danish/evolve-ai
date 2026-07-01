@@ -11,22 +11,22 @@ import io.minio.MinioClient;
 public class MinioConfig {
 
 	@Value("${minio.access.key}")
-    private String minioAccessKey;
+	private String minioAccessKey;
 
-    @Value("${minio.secret.key}")
-    private String minioSecretKey;
+	@Value("${minio.secret.key}")
+	private String minioSecretKey;
 
-    @Value("${minio.url}")
-    private String minioUrl;
+	@Value("${minio.url}")
+	private String minioUrl;
 
-    @Bean
-    MinioClient minioClient() {
-        return MinioClient.builder().endpoint(minioUrl).credentials(minioAccessKey, minioSecretKey).build();
-    }
+	@Bean
+	MinioClient minioClient() {
+		return MinioClient.builder().endpoint(minioUrl).credentials(minioAccessKey, minioSecretKey).build();
+	}
 
-    @Bean
-    MinioAsyncClient minioAsyncClient() {
-        return MinioAsyncClient.builder().endpoint(minioUrl).credentials(minioAccessKey, minioSecretKey).build();
-    }
-	
+	@Bean
+	MinioAsyncClient minioAsyncClient() {
+		return MinioAsyncClient.builder().endpoint(minioUrl).credentials(minioAccessKey, minioSecretKey).build();
+	}
+
 }

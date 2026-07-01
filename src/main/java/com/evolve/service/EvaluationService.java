@@ -21,18 +21,18 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Slf4j
 public class EvaluationService {
-	
+
 	private final ChatClient qwenChatClient;
 	private final RestClient restClient;
-	
+
 	@Value("classpath:/prompt-templates/evaluation_prompt.st")
 	private Resource evaluation_prompt;
-	
+
 	public EvaluationService(@Qualifier("qwenChatClient") ChatClient qwenChatClient) {
 		this.qwenChatClient = qwenChatClient;
 		this.restClient = RestClient.create("http://localhost:11434");
 	}
-	
+
 	public EvaluationResponse evaluateRequest(String message, List<String> similarDocs) {
 		log.info("Evaluating Message: {}", message);
 		PromptTemplate promptTemplate = new PromptTemplate(evaluation_prompt);
@@ -40,18 +40,16 @@ public class EvaluationService {
 		promptParameters.put("question", message);
 		promptParameters.put("documents", similarDocs);
 		Prompt prompt = promptTemplate.create(promptParameters);
-		
+
 		EvaluationResponse response = qwenChatClient.prompt(prompt).call().entity(EvaluationResponse.class);
 		log.info("evaluation response: {}", response);
 		return response;
 	}
-	
+
 	@PreDestroy
 	public void unloadQwen() {
-		restClient.post().uri("/api/generate")
-		.body(Map.of("model", "qwen2.5:1.5b", "keep_alive", 0))
-		.retrieve()
-		.toBodilessEntity();
+		restClient.post().uri("/api/generate").body(Map.of("model", "qwen2.5:1.5b", "keep_alive", 0)).retrieve()
+				.toBodilessEntity();
 	}
 
 }
