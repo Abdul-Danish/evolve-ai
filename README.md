@@ -372,12 +372,6 @@ EvolveAI/
 
 ---
 
-## 📄 License
-
-This project is open source. See the [LICENSE](LICENSE) file for details.
-
----
-
 <div align="center">
 
 Built with ❤️ using **Spring Boot · Spring AI · Kafka · pgvector · MinIO · Ollama**
