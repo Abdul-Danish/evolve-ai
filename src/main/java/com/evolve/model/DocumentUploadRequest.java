@@ -9,11 +9,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UploadObjectDto {
+public class DocumentUploadRequest {
 
 	private String fileName;
 	private byte[] file;
-//	private String minioFilePath;
 	private String moduleName;
+	private String presignedUrl;
+	private Long docId;
 
 }

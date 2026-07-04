@@ -2,19 +2,27 @@ package com.evolve.service;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.util.Base64;
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
 import io.minio.GetObjectArgs;
-import io.minio.GetObjectResponse;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.ObjectWriteResponse;
 import io.minio.PutObjectArgs;
+import io.minio.errors.ErrorResponseException;
+import io.minio.errors.InsufficientDataException;
+import io.minio.errors.InternalException;
+import io.minio.errors.InvalidResponseException;
 import io.minio.errors.MinioException;
+import io.minio.errors.ServerException;
+import io.minio.errors.XmlParserException;
 import io.minio.http.Method;
 import lombok.extern.slf4j.Slf4j;
 
@@ -67,17 +75,11 @@ public class MinioService {
 		}
 	}
 
-	public String getFile(String filePath) {
-		log.info("File Path is: {}", filePath);
-		GetObjectArgs getObjectArgs = GetObjectArgs.builder().bucket(bucketName).object(filePath).build();
-		try {
-			GetObjectResponse object = minioClient.getObject(getObjectArgs);
-			log.info("Object Retrieved: {}", object.object());
-			byte[] objectBytes = object.readAllBytes();
-			return Base64.getEncoder().encodeToString(objectBytes);
-		} catch (Exception e) {
-			throw new RuntimeException("Exception Occured While Retrieving File: ", e);
-		}
+	public InputStream downloadResource(String imagePath)
+			throws InvalidKeyException, ErrorResponseException, InsufficientDataException, InternalException,
+			InvalidResponseException, NoSuchAlgorithmException, ServerException, XmlParserException, IOException {
+		GetObjectArgs args = GetObjectArgs.builder().bucket(bucketName).object(imagePath).build();
+		return minioClient.getObject(args);
 	}
 
 }

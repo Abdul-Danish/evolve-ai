@@ -23,7 +23,9 @@ public class ModelConfig {
 	@Bean
 	public ChatModel llamaChatModel() {
 		return OllamaChatModel.builder().ollamaApi(OllamaApi.builder().baseUrl(ollmaBaseUrl).build())
-				.options(OllamaChatOptions.builder().model("llama3.2").build()).build();
+				.options(OllamaChatOptions.builder().numPredict(400).numCtx(2048).temperature(0.3).keepAlive("30m")
+						.model("llama3.2").build())
+				.build();
 	}
 
 	@Bean

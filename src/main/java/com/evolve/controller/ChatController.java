@@ -14,9 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.evolve.model.EvolveDocument;
-import com.evolve.model.UploadObjectDto;
+import com.evolve.model.DocumentUploadRequest;
 import com.evolve.service.ChatService;
-import com.evolve.service.UploadService;
+import com.evolve.service.DocumentUploadService;
 
 import io.minio.errors.MinioException;
 import reactor.core.publisher.Flux;
@@ -27,9 +27,9 @@ import reactor.core.publisher.Flux;
 public class ChatController {
 
 	private final ChatService chatService;
-	private final UploadService uploadService;
+	private final DocumentUploadService uploadService;
 
-	public ChatController(ChatService chatService, UploadService uploadService) {
+	public ChatController(ChatService chatService, DocumentUploadService uploadService) {
 		this.chatService = chatService;
 		this.uploadService = uploadService;
 	}
@@ -42,8 +42,8 @@ public class ChatController {
 	@PostMapping("/upload")
 	public ResponseEntity<Void> uploadObject(@RequestPart(value = "file") MultipartFile file,
 			@RequestParam(value = "moduleName") String moduleName) throws IOException, MinioException {
-		UploadObjectDto uploadDto = UploadObjectDto.builder().fileName(file.getOriginalFilename()).file(file.getBytes())
-				.moduleName(moduleName).build();
+		DocumentUploadRequest uploadDto = DocumentUploadRequest.builder().fileName(file.getOriginalFilename())
+				.file(file.getBytes()).moduleName(moduleName).build();
 		uploadService.uploadVector(uploadDto);
 		return ResponseEntity.accepted().build();
 	}

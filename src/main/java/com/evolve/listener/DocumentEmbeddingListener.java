@@ -1,9 +1,9 @@
 package com.evolve.listener;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
-import org.apache.commons.io.FilenameUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.ExtractedTextFormatter;
@@ -13,14 +13,14 @@ import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
 
 import com.evolve.model.DocumentStatus;
+import com.evolve.model.DocumentUploadRequest;
 import com.evolve.model.EvolveDocument;
-import com.evolve.model.UploadObjectDto;
-import com.evolve.repository.EvolveDocumentsRepository;
+import com.evolve.repository.DocumentRepository;
 import com.evolve.service.MinioService;
 
 import io.minio.errors.MinioException;
@@ -28,11 +28,11 @@ import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Slf4j
-public class VectorUploadListener {
+public class DocumentEmbeddingListener {
 
 	private final VectorStore vectorStore;
 	private final MinioService minioService;
-	private final EvolveDocumentsRepository documentsRepository;
+	private final DocumentRepository documentsRepository;
 
 	@Value("${minio.bucket.name}")
 	private String bucketName;
@@ -40,33 +40,29 @@ public class VectorUploadListener {
 	@Value("${minio.base.path}")
 	private String minioBasePath;
 
-	public VectorUploadListener(VectorStore vectorStore, MinioService minioService,
-			EvolveDocumentsRepository documentsRepository) {
+	public DocumentEmbeddingListener(VectorStore vectorStore, MinioService minioService,
+			DocumentRepository documentsRepository) {
 		this.vectorStore = vectorStore;
 		this.minioService = minioService;
 		this.documentsRepository = documentsRepository;
 	}
 
-	@KafkaListener(topics = "${topic.vector.upload}", groupId = "${spring.kafka.consumer.group-id}_vector")
-	public void uploadVector(ConsumerRecord<String, UploadObjectDto> consumerRecord)
-			throws MinioException, IOException {
-		UploadObjectDto uploadObject = consumerRecord.value();
-		byte[] content = uploadObject.getFile();
-		String fileName = uploadObject.getFileName();
-		String moduleName = uploadObject.getModuleName();
+	@KafkaListener(topics = "${topic.vector.upload}", groupId = "${spring.kafka.consumer.group-id}_vector", containerFactory = "kafkaListenerContainerFactory")
+	public void uploadVector(ConsumerRecord<String, DocumentUploadRequest> consumerRecord,
+			Acknowledgment acknowledgment) throws MinioException, IOException {
+		acknowledgment.acknowledge();
+		DocumentUploadRequest uploadRequest = consumerRecord.value();
+		String fileName = uploadRequest.getFileName();
+		String moduleName = uploadRequest.getModuleName();
 		String imagePath = minioBasePath + fileName;
-		EvolveDocument document = EvolveDocument.builder().moduleName(moduleName).fileName(fileName)
-				.fileExtension(FilenameUtils.getExtension(fileName)).fileSize((long) content.length)
-				.minioImagePath(imagePath).status(DocumentStatus.PENDING).build();
-		documentsRepository.save(document).getId();
+		String presignedUrl = uploadRequest.getPresignedUrl();
+		EvolveDocument document = null;
 		try {
-			String uploadedFilePath = minioService.uploadObject(fileName, content, minioBasePath);
-			String presignedUrl = minioService.getPresignedUrl(uploadedFilePath);
+			document = documentsRepository.findById(uploadRequest.getDocId()).get();
+			InputStream resourceContent = minioService.downloadResource(imagePath);
 
 			document.setStatus(DocumentStatus.PROCESSING);
 			documentsRepository.save(document);
-
-			Resource resourceContent = new ByteArrayResource(content);
 			uploadVector(resourceContent, presignedUrl, moduleName);
 
 			document.setStatus(DocumentStatus.COMPLETED);
@@ -80,33 +76,39 @@ public class VectorUploadListener {
 		}
 	}
 
-	public void uploadVector(Resource content, String presignedUrl, String moduleName) {
+	public void uploadVector(InputStream content, String presignedUrl, String moduleName)
+			throws InterruptedException, IOException {
 		log.info("Loading Vector Documents into the Database");
-
+		logMemory("Start Upload");
 		PdfDocumentReaderConfig readerConfig = PdfDocumentReaderConfig
 				.builder().withPageExtractedTextFormatter(ExtractedTextFormatter.builder()
 						.withNumberOfBottomTextLinesToDelete(0).withNumberOfTopPagesToSkipBeforeDelete(0).build())
 				.withPagesPerDocument(1).build();
 
-		PagePdfDocumentReader pageReader = new PagePdfDocumentReader(content, readerConfig);
-		TokenTextSplitter textSplitter = TokenTextSplitter.builder().build();
+		PagePdfDocumentReader pageReader = new PagePdfDocumentReader(new ByteArrayResource(content.readAllBytes()),
+				readerConfig);
+		logMemory("After PagePdfDocumentReader");
 
 		List<Document> documents = pageReader.get();
+		logMemory("After Reading PDF");
 		documents.forEach(document -> {
 			document.getMetadata().put("moduleName", moduleName);
 			document.getMetadata().put("documentUrl", presignedUrl);
 		});
 
+		TokenTextSplitter textSplitter = TokenTextSplitter.builder().build();
 		List<Document> chunks = textSplitter.apply(documents);
+		logMemory("After Chunking");
 		log.info("Text splitting completed. Chunks count: {}", chunks.size());
 
 		long start = System.currentTimeMillis();
-		int batchSize = 100;
+		int batchSize = 20;
 		for (int i = 0; i < chunks.size(); i += batchSize) {
 			int end = Math.min(i + batchSize, chunks.size());
 			vectorStore.accept(chunks.subList(i, end));
 			log.info("Processed {} / {}", end, chunks.size());
 		}
+		logMemory("After Vector Upload");
 		logResponse(start);
 		log.info("Vector Documents for [{}] module Loaded Successfully", moduleName);
 	}
@@ -116,5 +118,14 @@ public class VectorUploadListener {
 		long minutes = durationMs / 60000;
 		long seconds = (durationMs % 60000) / 1000;
 		log.info("Vector store insert completed in {} min {} sec", minutes, seconds);
+	}
+
+	private void logMemory(String stage) {
+		long free = Runtime.getRuntime().freeMemory() / 1048576;
+		long total = Runtime.getRuntime().totalMemory() / 1048576;
+		long max = Runtime.getRuntime().maxMemory() / 1048576;
+		long used = total - free;
+
+		log.info("[{}] Used: {} MB | Free: {} MB | Total: {} MB | Max: {} MB", stage, used, free, total, max);
 	}
 }

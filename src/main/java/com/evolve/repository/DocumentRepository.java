@@ -6,6 +6,6 @@ import org.springframework.stereotype.Repository;
 import com.evolve.model.EvolveDocument;
 
 @Repository
-public interface EvolveDocumentsRepository extends JpaRepository<EvolveDocument, Long> {
+public interface DocumentRepository extends JpaRepository<EvolveDocument, Long> {
 
 }
