@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/screenshots/chat-ui.png" alt="Evolve AI Banner" width="100%"/>
+<img src="assets/screenshots/evolve-ai-thumbnail.svg" alt="Evolve AI Banner" width="100%"/>
 
 # 🧠 Evolve AI
 ### Enterprise Document Intelligence Platform
